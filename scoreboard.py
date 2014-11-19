@@ -61,4 +61,7 @@ def get_nba_scores():
     elif "Live" in game['class']:
       period = re.search(r'(\d)', game.find("div", "nbaLiveStatTxSm").string).group()
       time = re.search(r'(\d*:\d\d)', game.find("div", "nbaLiveStatTxSm").string).group()
-
+    gameid = re.sub(r'nbaGL', '', game[id'])
+    scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
+  scores = soreted(scores, key=itemgetter('gameid'))
+  return(scores)
