@@ -1,6 +1,7 @@
 import re
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
+frome datetime import date
 
 def get_nhl_scores():
   html = urlopen("http://www.nhl.com/ice/m_scores.htm").read()    # pull HTML source code
@@ -40,4 +41,24 @@ def get_nhl_scores():
     scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
   scores = sorted(scores, key=itemgetter('gameid'))
   return(scores)                                      # returns the score list as the function output
+
+def get_nba_scores():
+  date = date.today()
+  url = 'http://www.nba.com/gameline/' + date.strftime("%Y%m%d")' + '/'
+  html = urlopen(url).read()    # pull HTML source code
+  soup = BeautifulSoup(html, "html")
+  games = soup.find_all(id=re.compile('nbaGL\d'))
+  for game in games:
+    teams = game.find_all("div", "nbaModTopTeamName")
+    awayteam = teams[0].string.upper()
+    hometeam = teams[1].string.upper()
+    scores = game.find_all("div", "nbaModTopTeamNum")
+    awayscore = scores[0].string
+    homescore = scores[1].string
+    if "Recap" in game['class']:
+      period = "F"
+      time = ""
+    elif "Live" in game['class']:
+      period = re.search(r'(\d)', game.find("div", "nbaLiveStatTxSm").string).group()
+      time = re.search(r'(\d*:\d\d)', game.find("div", "nbaLiveStatTxSm").string).group()
 
