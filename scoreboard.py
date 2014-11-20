@@ -44,7 +44,7 @@ def get_nhl_scores():
 
 def get_nba_scores():
   date = date.today()
-  url = 'http://www.nba.com/gameline/' + date.strftime("%Y%m%d")' + '/'
+  url = 'http://www.nba.com/gameline/' + date.strftime("%Y%m%d") + '/'
   html = urlopen(url).read()    # pull HTML source code
   soup = BeautifulSoup(html, "html")
   games = soup.find_all(id=re.compile('nbaGL\d'))
@@ -59,8 +59,18 @@ def get_nba_scores():
       period = "F"
       time = ""
     elif "Live" in game['class']:
-      period = re.search(r'(\d)', game.find("div", "nbaLiveStatTxSm").string).group()
+      if game.find("div", "nbaLiveStatTxSm").string == "HALFTIME":
+        period = "2"
+        time = "00:00"
+      else:
+        period = re.search(r'(\d)', game.find("div", "nbaLiveStatTxSm").string).group()
+        time = re.search(r'(\d*:\d\d)', game.find("div", "nbaLiveStatTxSm").string).group()
+    elif "LiveOT" in game['class']:
+      period = "0"
       time = re.search(r'(\d*:\d\d)', game.find("div", "nbaLiveStatTxSm").string).group()
+    elif "Pre" in game['class']:
+      period = ""
+      time = game.find("h2", "nbaPreStatTx").string
     gameid = re.sub(r'nbaGL', '', game[id'])
     scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
   scores = soreted(scores, key=itemgetter('gameid'))
