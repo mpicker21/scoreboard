@@ -1,9 +1,24 @@
-import re
+import re, threading
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
-frome datetime import date
+from datetime import date, timedelta
 
-def get_nhl_scores():
+scorestore = threading.Lock()
+
+def get_nhl_scores(date):
+  if date.month > 8:
+    season = str(date.year) + str(date.year + 1)
+  else:
+    season = str(date.year - 1) + str(date.year)
+  url = "http://www.nhl.com/ice/scores.htm?date=" + date.strftime('%m/%d/%Y') + "&season=" + season
+  html = urlopen(url).read()
+  soup = BeautifulSoup(html, "html")
+  awayteam = game.find_all("a", {"rel" : True})[0]['rel']
+  hometeam = game.find_all("a", {"rel" : True})[3]['rel']
+  awayscore = game.find_all("td", "total")[0].string
+  homescore = game.find_all("td", "total")[1].string
+  
+def old_get_nhl_scores():
   html = urlopen("http://www.nhl.com/ice/m_scores.htm").read()    # pull HTML source code
   soup = BeautifulSoup(html, "html")                  # input that source code to Beautiful Soup for parsing
   games = soup.find_all("table", class_="gmDisplay")  # extracts individual games and outputs as a list
@@ -71,7 +86,17 @@ def get_nba_scores():
     elif "Pre" in game['class']:
       period = ""
       time = game.find("h2", "nbaPreStatTx").string
-    gameid = re.sub(r'nbaGL', '', game[id'])
+    gameid = re.sub(r'nbaGL', '', game['id'])
     scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
   scores = soreted(scores, key=itemgetter('gameid'))
   return(scores)
+def update_scores():
+  global sport
+  if sport == "nhl":
+    scorestore.acquire()
+    scores = get_nhl_scores()
+    scorestore.release()
+  elif sport == "nba":
+    scorestore.acquire()
+    scores = get_nba_scores()
+    scorestore.release()
