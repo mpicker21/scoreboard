@@ -13,49 +13,32 @@ def get_nhl_scores(date):
   url = "http://www.nhl.com/ice/scores.htm?date=" + date.strftime('%m/%d/%Y') + "&season=" + season
   html = urlopen(url).read()
   soup = BeautifulSoup(html, "html")
-  awayteam = game.find_all("a", {"rel" : True})[0]['rel']
-  hometeam = game.find_all("a", {"rel" : True})[3]['rel']
-  awayscore = game.find_all("td", "total")[0].string
-  homescore = game.find_all("td", "total")[1].string
-  
-def old_get_nhl_scores():
-  html = urlopen("http://www.nhl.com/ice/m_scores.htm").read()    # pull HTML source code
-  soup = BeautifulSoup(html, "html")                  # input that source code to Beautiful Soup for parsing
-  games = soup.find_all("table", class_="gmDisplay")  # extracts individual games and outputs as a list
-  scores = []                                         # create scores list that will be populated with a dictionary for each game
+  games = soup.find_all("div", "gamebox")
   for game in games:
-    sections = game.find_all("td", colspan="1", rowspan="1")	# pulls the table of each game into sections, section 0 = awayteam, 1 = awayscore, 2 = time, 3 = hometeam, 4 = homescore	
-    awayteam = sections[0]				# this section extracts the three letter team names, first away, then home, from the links for each team
-    awayteam = awayteam.a.get('href')
-    awayteam = re.sub(r'.*=', '', awayteam)
-    hometeam = sections[3]
-    hometeam = hometeam.a.get('href')
-    hometeam = re.sub(r'.*=', '', hometeam)
-    awayscore = sections[1].string			# simply outputs the text contained in the score cells
-    homescore = sections[4].string
-    time = sections[2].span.string			# this block assigns the time/period section and cleans it up
-    period = ""
-    if re.search(r'FINAL', time) is not None:
-      period = "F"
+    awayteam = game.find_all("a", {"rel" : True})[0]['rel']
+    hometeam = game.find_all("a", {"rel" : True})[3]['rel']
+    awayscore = game.find_all("td", "total")[0].string
+    homescore = game.find_all("td", "total")[1].string
+    if re.search(r'FINAL', game.th.contents[0]) is not None:
       time = ""
-    elif re.search(r'ET', time) is not None:
-      time = re.search(r'(\d*:\d\d)', time).group()
-    elif re.search(r'END', time) is not None:
-      period = re.search(r'\s(\d)', time).group(1)
+      period = "F"
+    elif re.search(r'ET', game.th.contents[0]) is not None:
+      time = re.search(r'(\d*:\d\d)', game.th.contents[0]).group(1)
+      period = ""
+    elif re.search(r'END', game.th.contents[0]) is not None:
       time = "00:00"
-    elif re.search(r'st|nd|rd', time) is not None:
-      period = re.search(r'\s(\d)', time).group(1)
-      time = re.search(r'(\d\d:\d\d)', time).group()
+      period = re.search(r'\s(\d)', game.th.contents[0]).group(1)
+    elif re.search(r'st|nd|rd', game.th.contents[0]) is not None:
+      time = re.search(r'(\d\d:\d\d)', game.th.contents[0]).group()
+      period = re.search(r'\s(\d)', game.th.contents[0]).group(1)
     else:
+      time = re.search(r'(\d\d:\d\d)', game.th.contents[0]).group()
       period = "0"
-      time = re.search(r'(\d\d:\d\d)', time).group()
+    gameid = re.search('=(\d*)', game.find("div", "gcLinks").a['href']).group(1)
     time = re.sub(r':', '', time)
-    gameid = sections[2].a.get('href')		# this line pulls the gameid for sorting purposes
-    gameid = re.sub(r'.*=', '', gameid)
-    # this line populates the scores list with the appropriate groups/variables
     scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
   scores = sorted(scores, key=itemgetter('gameid'))
-  return(scores)                                      # returns the score list as the function output
+  return(scores)
 
 def get_nba_scores():
   date = date.today()
@@ -90,13 +73,12 @@ def get_nba_scores():
     scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
   scores = soreted(scores, key=itemgetter('gameid'))
   return(scores)
+
 def update_scores():
   global sport
   if sport == "nhl":
-    scorestore.acquire()
-    scores = get_nhl_scores()
-    scorestore.release()
+    with scorestore:
+      scores = get_nhl_scores()
   elif sport == "nba":
-    scorestore.acquire()
-    scores = get_nba_scores()
-    scorestore.release()
+    with scorestore:
+      scores = get_nba_scores()
