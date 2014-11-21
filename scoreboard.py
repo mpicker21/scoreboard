@@ -3,6 +3,10 @@ from bs4 import BeautifulSoup
 from urllib2 import urlopen
 from datetime import date, timedelta
 
+global date, dwell_time, sport
+date = date.today()
+dwell_time = 5
+sport = "nhl"
 scorestore = threading.Lock()
 
 def get_nhl_scores(date):
@@ -82,3 +86,42 @@ def update_scores():
   elif sport == "nba":
     with scorestore:
       scores = get_nba_scores()
+
+def ir_monitor():
+  listener = pifacecad.IREventListener(prog="scoreboard")
+  listener.register('vol+', change_vol)
+  listener.register('vol-', change_vol)
+  listener.register('mute', change_vol)
+  listener.register('right', change_game)
+  listener.register('left', change_game)
+  listener.register('up', change_day)
+  listener.register('down', change_day)
+  listener.register('ffwd', change_speed)
+  listener.register('rew', change_speed)
+  listener.register('pause', change_mode)
+  listener.register('power', shutdown)
+  listener.register('stop', toggle_display)  
+  listener.register('1', change_sport)
+  listener.register('2', change_sport)
+  listener.activate()
+
+def change_day(event):
+  global date
+  if event == "up":
+    date = date + datetime.timedelta(days=1)
+  elif event == "down":
+    date = date - datetime.timedelta(days=1)
+
+def change_speed(event):
+  global dwell_time
+  if event == "ffwd":
+    dwell_time -= 1
+  if event == "rew":
+    dwell_time += 1
+
+def change_sport(event):
+  global sport
+  if event == "1":
+    sport = "nhl"
+  if event == "2":
+    sport = "nba"
