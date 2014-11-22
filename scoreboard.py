@@ -9,9 +9,11 @@ date = date.today()
 dwell_time = 5
 refresh_rate = 60
 sport = "nhl"
+currentgame = 0
 scoredata = []
-scorestore = threading.Lock()
+scoreslock = threading.Lock()
 source_trigger = threading.Event()
+display_trigger = threading.Event()
 source_ready = threading.Event()
 
 def get_nhl_scores(date):
@@ -21,7 +23,6 @@ def get_nhl_scores(date):
   else:
     season = str(date.year - 1) + str(date.year)
   url = "http://www.nhl.com/ice/scores.htm?date=" + date.strftime('%m/%d/%Y') + "&season=" + season
-  print url
   html = urlopen(url).read()
   soup = BeautifulSoup(html, "html")
   games = soup.find_all("div", "gamebox")
@@ -51,9 +52,8 @@ def get_nhl_scores(date):
   scores = sorted(scores, key=itemgetter('gameid'))
   return(scores)
 
-def get_nba_scores():
+def get_nba_scores(date):
   scores = []
-  date = date.today()
   url = 'http://www.nba.com/gameline/' + date.strftime("%Y%m%d") + '/'
   html = urlopen(url).read()
   soup = BeautifulSoup(html, "html")
@@ -89,10 +89,10 @@ def get_nba_scores():
 def update_scores():
   global sport, scoredata
   if sport == "nhl":
-    with scorestore:
+    with scoreslock:
       scoredata = get_nhl_scores(date)
   elif sport == "nba":
-    with scorestore:
+    with scoreslock:
       scoredata = get_nba_scores(date)
 
 def ir_monitor():
@@ -135,18 +135,20 @@ def change_sport(event):
     sport = "nba"
 
 def test_display():
-  global scoredata
+  global scoredata, currentgame
   from time import sleep
   source_ready.wait()
   while True:
-    print scoredata
-    for game in scoredata:
-      print "Game: %s" % (game['gameid'])
-      print "Time: %s  Period: %s" % (game['time'], game['period'])
-      print "Away: %s    %s" % (game['awayteam'], game['awayscore'])
-      print "Home: %s    %s" % (game['hometeam'], game['homescore'])
+    with scoreslock:
+      print "Game: %s" % (scoredata[currentgame]['gameid'])
+      print "Time: %s  Period: %s" % (scoredata[currentgame]['time'], scoredata[currentgame]['period'])
+      print "Away: %s    %s" % (scoredata[currentgame]['awayteam'], scoredata[currentgame]['awayscore'])
+      print "Home: %s    %s" % (scoredata[currentgame]['hometeam'], scoredata[currentgame]['homescore'])
       print ""
-      sleep(5)
+    currentgame += 1
+    if currentgame > (len(scoredata) - 1):
+      currentgame = 0
+    sleep(5)
 
 def source_daemon():
   print "source_daemon is running"
