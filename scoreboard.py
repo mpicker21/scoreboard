@@ -2,25 +2,32 @@ import re, threading
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
 from datetime import date, timedelta
+from operator import itemgetter
 
 global date, dwell_time, sport
 date = date.today()
 dwell_time = 5
+refresh_rate = 60
 sport = "nhl"
+scoredata = []
 scorestore = threading.Lock()
+source_trigger = threading.Event()
+source_ready = threading.Event()
 
 def get_nhl_scores(date):
+  scores = []
   if date.month > 8:
     season = str(date.year) + str(date.year + 1)
   else:
     season = str(date.year - 1) + str(date.year)
   url = "http://www.nhl.com/ice/scores.htm?date=" + date.strftime('%m/%d/%Y') + "&season=" + season
+  print url
   html = urlopen(url).read()
   soup = BeautifulSoup(html, "html")
   games = soup.find_all("div", "gamebox")
   for game in games:
-    awayteam = game.find_all("a", {"rel" : True})[0]['rel']
-    hometeam = game.find_all("a", {"rel" : True})[3]['rel']
+    awayteam = game.find_all("a", {"rel" : True})[0]['rel'][0]
+    hometeam = game.find_all("a", {"rel" : True})[3]['rel'][0]
     awayscore = game.find_all("td", "total")[0].string
     homescore = game.find_all("td", "total")[1].string
     if re.search(r'FINAL', game.th.contents[0]) is not None:
@@ -45,9 +52,10 @@ def get_nhl_scores(date):
   return(scores)
 
 def get_nba_scores():
+  scores = []
   date = date.today()
   url = 'http://www.nba.com/gameline/' + date.strftime("%Y%m%d") + '/'
-  html = urlopen(url).read()    # pull HTML source code
+  html = urlopen(url).read()
   soup = BeautifulSoup(html, "html")
   games = soup.find_all(id=re.compile('nbaGL\d'))
   for game in games:
@@ -79,13 +87,13 @@ def get_nba_scores():
   return(scores)
 
 def update_scores():
-  global sport
+  global sport, scoredata
   if sport == "nhl":
     with scorestore:
-      scores = get_nhl_scores()
+      scoredata = get_nhl_scores(date)
   elif sport == "nba":
     with scorestore:
-      scores = get_nba_scores()
+      scoredata = get_nba_scores(date)
 
 def ir_monitor():
   listener = pifacecad.IREventListener(prog="scoreboard")
@@ -125,3 +133,36 @@ def change_sport(event):
     sport = "nhl"
   if event == "2":
     sport = "nba"
+
+def test_display():
+  global scoredata
+  from time import sleep
+  source_ready.wait()
+  while True:
+    print scoredata
+    for game in scoredata:
+      print "Game: %s" % (game['gameid'])
+      print "Time: %s  Period: %s" % (game['time'], game['period'])
+      print "Away: %s    %s" % (game['awayteam'], game['awayscore'])
+      print "Home: %s    %s" % (game['hometeam'], game['homescore'])
+      print ""
+      sleep(5)
+
+def source_daemon():
+  print "source_daemon is running"
+  while True:
+    while not source_trigger.is_set():
+      print "updating scores"
+      update_scores()
+      source_ready.set()
+      source_trigger.wait(refresh_rate)
+    source_trigger.clear()
+
+def main():
+  source = threading.Thread(target=source_daemon)
+  source.daemon = True
+  source.start()
+  test_display()
+
+main()
+
