@@ -1,4 +1,4 @@
-import re, threading
+import re, threading, subprocess
 from bs4 import BeautifulSoup
 from urllib2 import urlopen
 from datetime import date, timedelta
@@ -17,6 +17,7 @@ display_trigger = threading.Event()
 source_ready = threading.Event()
 
 def get_nhl_scores(date):
+  global scoredata
   scores = []
   if date.month > 8:
     season = str(date.year) + str(date.year + 1)
@@ -50,9 +51,12 @@ def get_nhl_scores(date):
     time = re.sub(r':', '', time)
     scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
   scores = sorted(scores, key=itemgetter('gameid'))
-  return(scores)
+  with scoreslock:
+    scoredata = scores
+  return
 
 def get_nba_scores(date):
+  global scoredata
   scores = []
   url = 'http://www.nba.com/gameline/' + date.strftime("%Y%m%d") + '/'
   html = urlopen(url).read()
@@ -84,16 +88,16 @@ def get_nba_scores(date):
     gameid = re.sub(r'nbaGL', '', game['id'])
     scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
   scores = soreted(scores, key=itemgetter('gameid'))
-  return(scores)
+  with scoreslock:
+    scoredata = scores
+  return
 
 def update_scores():
-  global sport, scoredata
+  global sport
   if sport == "nhl":
-    with scoreslock:
-      scoredata = get_nhl_scores(date)
+    get_nhl_scores(date)
   elif sport == "nba":
-    with scoreslock:
-      scoredata = get_nba_scores(date)
+    get_nba_scores(date)
 
 def ir_monitor():
   listener = pifacecad.IREventListener(prog="scoreboard")
@@ -113,12 +117,34 @@ def ir_monitor():
   listener.register('2', change_sport)
   listener.activate()
 
+def change_vol(event):
+  if event == "vol+":
+    subprocess.call("amixer", "set", "PCM", "200+")
+  if event == "vol-":
+    subprocess.call("amixer", "set", "PCM", "200-")
+  if event == "mute":
+    subprocess.call("amixer", "set", "PCM", "toggle")
+
+
+def change_game(event):
+  global currentgame, scoredata
+  if event == "right":
+    currentgame += 1
+    if currentgame > (len(scoredata) - 1)
+      currentgame = 0
+  elif currentgame == "left":
+    currentgame -= 1
+    if currentgame < 0:
+      currentgame = (len(scoredata) -1)
+  display_trigger.set()
+
 def change_day(event):
   global date
   if event == "up":
     date = date + datetime.timedelta(days=1)
   elif event == "down":
     date = date - datetime.timedelta(days=1)
+  source_trigger.set()
 
 def change_speed(event):
   global dwell_time
@@ -127,12 +153,16 @@ def change_speed(event):
   if event == "rew":
     dwell_time += 1
 
+def shutdown():
+  subprocess.call("shutdown", "-h", "now")
+
 def change_sport(event):
   global sport
   if event == "1":
     sport = "nhl"
   if event == "2":
     sport = "nba"
+  source_trigger.set()
 
 def test_display():
   global scoredata, currentgame
