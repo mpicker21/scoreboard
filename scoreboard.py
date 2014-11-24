@@ -4,13 +4,14 @@ from urllib2 import urlopen
 from datetime import date, timedelta
 from operator import itemgetter
 
-global date, dwell_time, sport
 date = date.today()
 dwell_time = 5
 refresh_rate = 60
 sport = "nhl"
 currentgame = 0
 scoredata = []
+nfl_season = ""
+nfl_week = ""
 scoreslock = threading.Lock()
 source_trigger = threading.Event()
 display_trigger = threading.Event()
@@ -87,10 +88,62 @@ def get_nba_scores(date):
       time = game.find("h2", "nbaPreStatTx").string
     gameid = re.sub(r'nbaGL', '', game['id'])
     scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
-  scores = soreted(scores, key=itemgetter('gameid'))
+  scores = sorted(scores, key=itemgetter('gameid'))
   with scoreslock:
     scoredata = scores
   return
+
+def get_nfl_score(date):
+  global scoredata, nfl_season, nfl_week
+  scores = []
+  if date == date.today():
+    raw = urlopen("http://www.nfl.com/liveupdate/scorestrip/scorestrip.json").read()
+    raw = re.sub(r',,', ',"",', raw)
+    raw = re.sub(r',,', ',"",', raw)
+    games = json.loads(raw)['ss']
+    for game in games:
+      awayteam = game[4]
+      hometeam = game[6]
+      awayscore = game[5]
+      homescore = game[7]
+      if game[2] == "Final":
+        period = "F"
+        time = ""
+      elif game[2] == "Pregame":
+        period = ""
+        time = re.sub(":", "", game[1])
+      elif re.search(r'\d', game[2]) is not None:
+        period = re.search(r'(\d)', game[2]).group()
+        time = re.search(r'(\d*:\d\d)', game[3]).group()
+# Still need halftime, OT (end of qtrs go straight to next qtr)
+      gameid = game[10]
+      scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
+    scores = sorted(scores, key=itemgetter('gameid'))
+    nfl_season = games[0][13]
+    nfl_week = games[0][12]
+    with scoreslock:
+      scoredata = scores
+    return  
+  else:
+    url = "http://www.nfl.com/scores/" + nfl_season + "/" + nfl_week
+    html = urlopen(url).read()
+    soup = BeautifulSoup(html, "html")
+    games = soup.find_all(id=re.compile('scorebox-\d'))
+    for game in games:
+      awayteam = re.sub(r'.*=', '', game.find("div", "away-team").a['href'])
+      hometeam = re.sub(r'.*=', '', game.find("div", "home-team").a['href'])
+      awayscore = game.find_all("p", "total-score")[0].string
+      homescore = game.find_all("p", "total-score")[1].string
+      if "ET" in game.find("span", "time-left").string:
+        period = ""
+        time = re.search(r'(\d*:\d\d)', game.find("span", "time-left").string).group()
+      elif "FINAL" in game.find("span", "time-left").string:
+        period = "F"
+        time = ""
+      gameid = re.sub("scorebox-", "", game['id'])
+      scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
+    scores = sorted(scores, key=itemgetter('gameid'))
+    return
 
 def update_scores():
   global sport
@@ -139,11 +192,29 @@ def change_game(event):
   display_trigger.set()
 
 def change_day(event):
-  global date
+  global date, nfl_week
   if event == "up":
     date = date + datetime.timedelta(days=1)
+    if sport == "nfl":
+      if nfl_week[:3] == "PRE":
+        if int(nfl_week[3:]) > 0:
+          nfl_week = "PRE" + str(int(nfl_week[3:]0 - 1)
+      else:
+        if int(nfl_week[3:]) < 1:
+          nfl_week = "REG" + str(int(nfl_week[3:]0 - 1)
+        elif int(nfl_week[3:]) == 1:
+          nfl_week = "PRE4"
   elif event == "down":
     date = date - datetime.timedelta(days=1)
+    if sport == "nfl":
+      if nfl_week[:3] == "PRE":
+        if int(nfl_week[3:]) < 4:
+          nfl_week = "PRE" + str(int(nfl_week[3:]0 + 1)
+        elif int(nfl_week[3:]) == 4:
+          nfl_week = "REG1"
+      else:
+        if int(nfl_week[3:]) < 17:
+          nfl_week = "REG" + str(int(nfl_week[3:]0 + 1)
   source_trigger.set()
 
 def change_speed(event):
@@ -157,11 +228,12 @@ def shutdown():
   subprocess.call("shutdown", "-h", "now")
 
 def change_sport(event):
-  global sport
+  global sport, date
   if event == "1":
     sport = "nhl"
   if event == "2":
     sport = "nba"
+  date = date.today()
   source_trigger.set()
 
 def test_display():
