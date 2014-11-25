@@ -20,41 +20,70 @@ source_ready = threading.Event()
 def get_nhl_scores(date):
   global scoredata
   scores = []
-  if date.month > 8:
-    season = str(date.year) + str(date.year + 1)
-  else:
-    season = str(date.year - 1) + str(date.year)
-  url = "http://www.nhl.com/ice/scores.htm?date=" + date.strftime('%m/%d/%Y') + "&season=" + season
-  html = urlopen(url).read()
-  soup = BeautifulSoup(html, "html")
-  games = soup.find_all("div", "gamebox")
+  url = "http://live.nhle.com/GameData/GCScoreboard/" + date.strftime('%Y-%m-%d') = ".jsonp"
+  raw = urlopen(url).read()
+  raw = re.sub("loadScoreboard\(", "", raw)
+  raw = re.sub("\)\\n", "", raw)
+  games = json.loads(raw)['games']
   for game in games:
-    awayteam = game.find_all("a", {"rel" : True})[0]['rel'][0]
-    hometeam = game.find_all("a", {"rel" : True})[3]['rel'][0]
-    awayscore = game.find_all("td", "total")[0].string
-    homescore = game.find_all("td", "total")[1].string
-    if re.search(r'FINAL', game.th.contents[0]) is not None:
+    awayteam = game['ata']
+    hometeam = game['hta']
+    awayscore = game['ats']
+    homescore = game['hts']
+    if game['gs'] == 1:
+      time = re.search(r'(\d*:\d\d)', game['bs']).group(1)
+      period = ""
+    elif game['gs'] == 3:
+      time = re.search(r'(\d*:\d\d)', game['bs']).group(1)
+      period = period = re.search(r'\s(\d)', game['bs']).group(1)
+    elif game['gs'] == 5:
       time = ""
       period = "F"
-    elif re.search(r'ET', game.th.contents[0]) is not None:
-      time = re.search(r'(\d*:\d\d)', game.th.contents[0]).group(1)
-      period = ""
-    elif re.search(r'END', game.th.contents[0]) is not None:
-      time = "00:00"
-      period = re.search(r'\s(\d)', game.th.contents[0]).group(1)
-    elif re.search(r'st|nd|rd', game.th.contents[0]) is not None:
-      time = re.search(r'(\d\d:\d\d)', game.th.contents[0]).group()
-      period = re.search(r'\s(\d)', game.th.contents[0]).group(1)
-    else:
-      time = re.search(r'(\d\d:\d\d)', game.th.contents[0]).group()
-      period = "0"
-    gameid = re.search('=(\d*)', game.find("div", "gcLinks").a['href']).group(1)
-    time = re.sub(r':', '', time)
+    gameid = game['id']
     scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
   scores = sorted(scores, key=itemgetter('gameid'))
   with scoreslock:
     scoredata = scores
   return
+
+##def get_nhl_scores(date):
+##  global scoredata
+##  scores = []
+##  if date.month > 8:
+##    season = str(date.year) + str(date.year + 1)
+##  else:
+##    season = str(date.year - 1) + str(date.year)
+##  url = "http://www.nhl.com/ice/scores.htm?date=" + date.strftime('%m/%d/%Y') + "&season=" + season
+##  html = urlopen(url).read()
+##  soup = BeautifulSoup(html, "html")
+##  games = soup.find_all("div", "gamebox")
+##  for game in games:
+##    awayteam = game.find_all("a", {"rel" : True})[0]['rel'][0]
+##    hometeam = game.find_all("a", {"rel" : True})[3]['rel'][0]
+##    awayscore = game.find_all("td", "total")[0].string
+##    homescore = game.find_all("td", "total")[1].string
+##    if re.search(r'FINAL', game.th.contents[0]) is not None:
+##      time = ""
+##      period = "F"
+##    elif re.search(r'ET', game.th.contents[0]) is not None:
+##      time = re.search(r'(\d*:\d\d)', game.th.contents[0]).group(1)
+##      period = ""
+##    elif re.search(r'END', game.th.contents[0]) is not None:
+##      time = "00:00"
+##      period = re.search(r'\s(\d)', game.th.contents[0]).group(1)
+##    elif re.search(r'st|nd|rd', game.th.contents[0]) is not None:
+##      time = re.search(r'(\d\d:\d\d)', game.th.contents[0]).group()
+##      period = re.search(r'\s(\d)', game.th.contents[0]).group(1)
+##    else:
+##      time = re.search(r'(\d\d:\d\d)', game.th.contents[0]).group()
+##      period = "0"
+##    gameid = re.search('=(\d*)', game.find("div", "gcLinks").a['href']).group(1)
+##    time = re.sub(r':', '', time)
+##    scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
+##  scores = sorted(scores, key=itemgetter('gameid'))
+##  with scoreslock:
+##    scoredata = scores
+##  return
 
 def get_nba_scores(date):
   global scoredata
@@ -183,7 +212,7 @@ def change_game(event):
   global currentgame, scoredata
   if event == "right":
     currentgame += 1
-    if currentgame > (len(scoredata) - 1)
+    if currentgame > (len(scoredata) - 1):
       currentgame = 0
   elif currentgame == "left":
     currentgame -= 1
@@ -198,10 +227,10 @@ def change_day(event):
     if sport == "nfl":
       if nfl_week[:3] == "PRE":
         if int(nfl_week[3:]) > 0:
-          nfl_week = "PRE" + str(int(nfl_week[3:]0 - 1)
+          nfl_week = "PRE" + str(int(nfl_week[3:]) - 1)
       else:
         if int(nfl_week[3:]) < 1:
-          nfl_week = "REG" + str(int(nfl_week[3:]0 - 1)
+          nfl_week = "REG" + str(int(nfl_week[3:]) - 1)
         elif int(nfl_week[3:]) == 1:
           nfl_week = "PRE4"
   elif event == "down":
@@ -209,12 +238,12 @@ def change_day(event):
     if sport == "nfl":
       if nfl_week[:3] == "PRE":
         if int(nfl_week[3:]) < 4:
-          nfl_week = "PRE" + str(int(nfl_week[3:]0 + 1)
+          nfl_week = "PRE" + str(int(nfl_week[3:]) + 1)
         elif int(nfl_week[3:]) == 4:
           nfl_week = "REG1"
       else:
         if int(nfl_week[3:]) < 17:
-          nfl_week = "REG" + str(int(nfl_week[3:]0 + 1)
+          nfl_week = "REG" + str(int(nfl_week[3:]) + 1)
   source_trigger.set()
 
 def change_speed(event):
