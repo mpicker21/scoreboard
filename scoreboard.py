@@ -6,7 +6,7 @@ from operator import itemgetter
 date = date.today()
 dwell_time = 5
 refresh_rate = 60
-sport = "nhl"
+sport = "nfl"
 currentgame = 0
 scoredata = []
 nfl_season = ""
@@ -105,19 +105,20 @@ def get_nba_scores(date):
   global scoredata
   scores = []
   url = "http://data.nba.com/5s/json/cms/noseason/scoreboard/" + date.strftime('%Y%m%d') + "/games.json"
+  raw = urlopen(url).read()
   games = json.loads(raw)['sports_content']['games']['game']
   for game in games:
     awayteam = game['visitor']['team_key']
     hometeam = game['home']['team_key']
     awayscore = game['visitor']['score']
     homescore = game['home']['score']
-    if game['period_time']['game_status'] == 1:
+    if game['period_time']['game_status'] == "1":
       time = re.search(r'(\d*:\d\d)', game['period_time']['period_status']).group(1)
       period = ""
-    elif game['period_time']['game_status'] == 2:
+    elif game['period_time']['game_status'] == "2":
       time = game['period_time']['game_clock']
       period = game['period_time']['period_value']
-    elif game['period_time']['game_status'] == 3:
+    elif game['period_time']['game_status'] == "3":
       time = ""
       period = "F"
     gameid = game['id']
@@ -166,13 +167,14 @@ def get_nba_scores(date):
 
 def get_nfl_scores(nfl_time):
   global scoredata
-  games = nflgames.games(nfl_season, week=nfl_time[0], kind=nfl_time[1])
+  scores = []
+  games = nflgame.games(nfl_season, week=nfl_weeks[nfl_time][0], kind=nfl_weeks[nfl_time][1])
   for game in games:
     awayteam = game.away
     hometeam = game.home
     awayscore = game.score_away
     homescore = game.score_home
-    if game.is_pregame():
+    if game.time.is_pregame():
       time = game.schedule['time']
       period = ""
     elif game.time.is_final():
@@ -353,8 +355,8 @@ def source_daemon():
 
 def main():
   global nfl_time, nfl_weeks
-  nfl_time = set_nfl_current()
   nfl_weeks = build_nfl_times()
+  nfl_time = set_nfl_current()
   source = threading.Thread(target=source_daemon)
   source.daemon = True
   source.start()
