@@ -10,8 +10,8 @@ sport = "nhl"
 currentgame = 0
 scoredata = []
 nfl_season = ""
-nfl_time = set_nfl_current()
-nfl_weeks = build_nfl_times()
+nfl_time = ""
+nfl_weeks = ""
 scoreslock = threading.Lock()
 source_trigger = threading.Event()
 display_trigger = threading.Event()
@@ -36,7 +36,7 @@ def set_nfl_current():
 def get_nhl_scores(date):
   global scoredata
   scores = []
-  url = "http://live.nhle.com/GameData/GCScoreboard/" + date.strftime('%Y-%m-%d') = ".jsonp"
+  url = "http://live.nhle.com/GameData/GCScoreboard/" + date.strftime('%Y-%m-%d') + ".jsonp"
   raw = urlopen(url).read()
   raw = re.sub("loadScoreboard\(", "", raw)
   raw = re.sub("\)\\n", "", raw)
@@ -352,6 +352,9 @@ def source_daemon():
     source_trigger.clear()
 
 def main():
+  global nfl_time, nfl_weeks
+  nfl_time = set_nfl_current()
+  nfl_weeks = build_nfl_times()
   source = threading.Thread(target=source_daemon)
   source.daemon = True
   source.start()
