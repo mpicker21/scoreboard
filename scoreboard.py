@@ -168,6 +168,22 @@ def get_nba_scores(date):
 def get_nfl_scores(nfl_time):
   global scoredata
   scores = []
+  this_week = []
+  sched = nflgame.sched.games
+##  populate this_week with a template for this week
+  for key in sched:
+    if sched['key']['year'] == nfl_season:
+      if sched['key']['season_type'] == nfl_weeks[nfl_time][1]:
+        if sched['key']['week'] == nfl_weeks[nfl_time][0]:
+          awayteam = sched['key']['away']
+          awayscore = ""
+          hometeam = sched['key']['home']
+          homescore = ""
+          time = sched['key']['time']
+          period = ""
+          gameid = sched['key']['gamekey']
+          this_week.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
+
   games = nflgame.games(nfl_season, week=nfl_weeks[nfl_time][0], kind=nfl_weeks[nfl_time][1])
   for game in games:
     awayteam = game.away
