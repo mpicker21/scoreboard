@@ -62,45 +62,6 @@ def get_nhl_scores(date):
     scoredata = scores
   return
 
-##def get_nhl_scores(date):
-##  global scoredata
-##  scores = []
-##  if date.month > 8:
-##    season = str(date.year) + str(date.year + 1)
-##  else:
-##    season = str(date.year - 1) + str(date.year)
-##  url = "http://www.nhl.com/ice/scores.htm?date=" + date.strftime('%m/%d/%Y') + "&season=" + season
-##  html = urlopen(url).read()
-##  soup = BeautifulSoup(html, "html")
-##  games = soup.find_all("div", "gamebox")
-##  for game in games:
-##    awayteam = game.find_all("a", {"rel" : True})[0]['rel'][0]
-##    hometeam = game.find_all("a", {"rel" : True})[3]['rel'][0]
-##    awayscore = game.find_all("td", "total")[0].string
-##    homescore = game.find_all("td", "total")[1].string
-##    if re.search(r'FINAL', game.th.contents[0]) is not None:
-##      time = ""
-##      period = "F"
-##    elif re.search(r'ET', game.th.contents[0]) is not None:
-##      time = re.search(r'(\d*:\d\d)', game.th.contents[0]).group(1)
-##      period = ""
-##    elif re.search(r'END', game.th.contents[0]) is not None:
-##      time = "00:00"
-##      period = re.search(r'\s(\d)', game.th.contents[0]).group(1)
-##    elif re.search(r'st|nd|rd', game.th.contents[0]) is not None:
-##      time = re.search(r'(\d\d:\d\d)', game.th.contents[0]).group()
-##      period = re.search(r'\s(\d)', game.th.contents[0]).group(1)
-##    else:
-##      time = re.search(r'(\d\d:\d\d)', game.th.contents[0]).group()
-##      period = "0"
-##    gameid = re.search('=(\d*)', game.find("div", "gcLinks").a['href']).group(1)
-##    time = re.sub(r':', '', time)
-##    scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
-##  scores = sorted(scores, key=itemgetter('gameid'))
-##  with scoreslock:
-##    scoredata = scores
-##  return
-
 def get_nba_scores(date):
   global scoredata
   scores = []
@@ -128,43 +89,6 @@ def get_nba_scores(date):
     scoredata = scores
   return
 
-##def get_nba_scores(date):
-##  global scoredata
-##  scores = []
-##  url = 'http://www.nba.com/gameline/' + date.strftime("%Y%m%d") + '/'
-##  html = urlopen(url).read()
-##  soup = BeautifulSoup(html, "html")
-##  games = soup.find_all(id=re.compile('nbaGL\d'))
-##  for game in games:
-##    teams = game.find_all("div", "nbaModTopTeamName")
-##    awayteam = teams[0].string.upper()
-##    hometeam = teams[1].string.upper()
-##    scores = game.find_all("div", "nbaModTopTeamNum")
-##    awayscore = scores[0].string
-##    homescore = scores[1].string
-##    if "Recap" in game['class']:
-##      period = "F"
-##      time = ""
-##    elif "Live" in game['class']:
-##      if game.find("div", "nbaLiveStatTxSm").string == "HALFTIME":
-##        period = "2"
-##        time = "00:00"
-##      else:
-##        period = re.search(r'(\d)', game.find("div", "nbaLiveStatTxSm").string).group()
-##        time = re.search(r'(\d*:\d\d)', game.find("div", "nbaLiveStatTxSm").string).group()
-##    elif "LiveOT" in game['class']:
-##      period = "0"
-##      time = re.search(r'(\d*:\d\d)', game.find("div", "nbaLiveStatTxSm").string).group()
-##    elif "Pre" in game['class']:
-##      period = ""
-##      time = game.find("h2", "nbaPreStatTx").string
-##    gameid = re.sub(r'nbaGL', '', game['id'])
-##    scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
-##  scores = sorted(scores, key=itemgetter('gameid'))
-##  with scoreslock:
-##    scoredata = scores
-##  return
-
 def get_nfl_scores(nfl_time):
   global scoredata
   scores = []
@@ -172,91 +96,38 @@ def get_nfl_scores(nfl_time):
   sched = nflgame.sched.games
 ##  populate this_week with a template for this week
   for key in sched:
-    if sched['key']['year'] == nfl_season:
-      if sched['key']['season_type'] == nfl_weeks[nfl_time][1]:
-        if sched['key']['week'] == nfl_weeks[nfl_time][0]:
-          awayteam = sched['key']['away']
+    if sched[key]['year'] == nfl_season:
+      if sched[key]['season_type'] == nfl_weeks[nfl_time][1]:
+        if sched[key]['week'] == nfl_weeks[nfl_time][0]:
+          awayteam = sched[key]['away']
+          hometeam = sched[key]['home']
           awayscore = ""
-          hometeam = sched['key']['home']
           homescore = ""
-          time = sched['key']['time']
+          time = sched[key]['time']
           period = ""
-          gameid = sched['key']['gamekey']
+          gameid = sched[key]['gamekey']
           this_week.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
-
   games = nflgame.games(nfl_season, week=nfl_weeks[nfl_time][0], kind=nfl_weeks[nfl_time][1])
-  for game in games:
-    awayteam = game.away
-    hometeam = game.home
-    awayscore = game.score_away
-    homescore = game.score_home
-    if game.time.is_pregame():
-      time = game.schedule['time']
-      period = ""
-    elif game.time.is_final():
-      time = ""
-      period = "F"  
-    else:
-      time = game.time.clock
-      period = game.time.qtr
-    gameid = game.gamekey
-    scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
-  scores = sorted(scores, key=itemgetter('gameid'))
+##  run through this_week and fill in scores for finished/ongoing games
+  for game in this_week:
+    for g in games:
+      if g.gamekey == game['gameid']:
+        if g.time.is_pregame():
+          pass
+        elif g.time.is_final():
+          game['awayscore'] = g.score_away
+          game['homescore'] = g.score_home
+          game['time'] = ""
+          game['period'] = "F"
+        else:
+          game['awayscore'] = g.score_away
+          game['homescore'] = g.score_home
+          game['time'] = g.time.clock
+          game['period'] = g.time.qtr
+  this_week = sorted(this_week, key=itemgetter('gameid'))
   with scoreslock:
-    scoredata = scores
+    scoredata = this_week
   return
-
-##def get_nfl_score(date):
-##  global scoredata, nfl_season, nfl_week
-##  scores = []
-##  if date == date.today():
-##    raw = urlopen("http://www.nfl.com/liveupdate/scorestrip/scorestrip.json").read()
-##    raw = re.sub(r',,', ',"",', raw)
-##    raw = re.sub(r',,', ',"",', raw)
-##    games = json.loads(raw)['ss']
-##    for game in games:
-##      awayteam = game[4]
-##      hometeam = game[6]
-##      awayscore = game[5]
-##      homescore = game[7]
-##      if game[2] == "Final":
-##        period = "F"
-##        time = ""
-##      elif game[2] == "Pregame":
-##        period = ""
-##        time = re.sub(":", "", game[1])
-##      elif re.search(r'\d', game[2]) is not None:
-##        period = re.search(r'(\d)', game[2]).group()
-##        time = re.search(r'(\d*:\d\d)', game[3]).group()
-### Still need halftime, OT (end of qtrs go straight to next qtr)
-##      gameid = game[10]
-##      scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
-##    scores = sorted(scores, key=itemgetter('gameid'))
-##    nfl_season = games[0][13]
-##    nfl_week = games[0][12]
-##    with scoreslock:
-##      scoredata = scores
-##    return  
-##  else:
-##    url = "http://www.nfl.com/scores/" + nfl_season + "/" + nfl_week
-##    html = urlopen(url).read()
-##    soup = BeautifulSoup(html, "html")
-##    games = soup.find_all(id=re.compile('scorebox-\d'))
-##    for game in games:
-##      awayteam = re.sub(r'.*=', '', game.find("div", "away-team").a['href'])
-##      hometeam = re.sub(r'.*=', '', game.find("div", "home-team").a['href'])
-##      awayscore = game.find_all("p", "total-score")[0].string
-##      homescore = game.find_all("p", "total-score")[1].string
-##      if "ET" in game.find("span", "time-left").string:
-##        period = ""
-##        time = re.search(r'(\d*:\d\d)', game.find("span", "time-left").string).group()
-##      elif "FINAL" in game.find("span", "time-left").string:
-##        period = "F"
-##        time = ""
-##      gameid = re.sub("scorebox-", "", game['id'])
-##      scores.append({"awayteam": awayteam, "awayscore": awayscore, "hometeam": hometeam, "homescore": homescore, "period": period, "time": time, "gameid": gameid})
-##    scores = sorted(scores, key=itemgetter('gameid'))
-##    return
 
 def update_scores():
   global sport
