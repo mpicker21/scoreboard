@@ -17,7 +17,7 @@ source_trigger = threading.Event()
 display_trigger = threading.Event()
 source_ready = threading.Event()
 
-def build_nfl_times():
+def build_nfl_times():                                                    # Build table of PRE/REG/POST and weeks in each to make it easier to reference with nfl_time
   a = []
   for x in range(0, 4 + 1):
     a.append([x, 'PRE'])
@@ -27,13 +27,13 @@ def build_nfl_times():
     a.append([x, 'POST'])
   return a
 
-def set_nfl_current():
+def set_nfl_current():                                                    # Sets the current nfl_season and returns the current nfl_time
   global nfl_season
   cyad = nflgame.live.current_year_and_week()
   nfl_season = cyad[0]
   return nfl_weeks.index([cyad[1], nflgame.live._cur_season_phase])
 
-def get_nhl_scores(date):
+def get_nhl_scores(date):                                                 # Pulls json files from NHL, parses them, and fills scoredata with data
   global scoredata
   scores = []
   url = "http://live.nhle.com/GameData/GCScoreboard/" + date.strftime('%Y-%m-%d') + ".jsonp"
@@ -62,7 +62,7 @@ def get_nhl_scores(date):
     scoredata = scores
   return
 
-def get_nba_scores(date):
+def get_nba_scores(date):                                                 # Pulls json files fron NBA, parses them, and fills scoredata with data
   global scoredata
   scores = []
   url = "http://data.nba.com/5s/json/cms/noseason/scoreboard/" + date.strftime('%Y%m%d') + "/games.json"
@@ -89,7 +89,7 @@ def get_nba_scores(date):
     scoredata = scores
   return
 
-def get_nfl_scores(nfl_time):
+def get_nfl_scores(nfl_time):                                             # Uses nflgame to fill scoredata with data
   global scoredata
   scores = []
   this_week = []
@@ -129,7 +129,7 @@ def get_nfl_scores(nfl_time):
     scoredata = this_week
   return
 
-def update_scores():
+def update_scores():                                                      # Runs the appropriate score source to update scores
   global sport
   if sport == "nhl":
     get_nhl_scores(date)
@@ -138,7 +138,7 @@ def update_scores():
   elif sport == "nfl":
     get_nfl_scores(nfl_time)
 
-def ir_monitor():
+def ir_monitor():                                                         # IR daemon, sets up listener for buttons and ties them to commands
   listener = pifacecad.IREventListener(prog="scoreboard")
   listener.register('vol+', change_vol)
   listener.register('vol-', change_vol)
@@ -156,7 +156,7 @@ def ir_monitor():
   listener.register('2', change_sport)
   listener.activate()
 
-def change_vol(event):
+def change_vol(event):                                                    # Changes volume up, down, or toggles mute... obviously
   if event == "vol+":
     subprocess.call("amixer", "set", "PCM", "200+")
   if event == "vol-":
@@ -164,7 +164,7 @@ def change_vol(event):
   if event == "mute":
     subprocess.call("amixer", "set", "PCM", "toggle")
 
-def change_game(event):
+def change_game(event):                                                   # Updates currentgame to the next or previous game and then triggers the display to change
   global currentgame, scoredata
   if event == "right":
     currentgame += 1
@@ -176,7 +176,7 @@ def change_game(event):
       currentgame = (len(scoredata) -1)
   display_trigger.set()
 
-def change_day(event):
+def change_day(event):                                                    # Updates date to next or previous day, triggers source refresh, and triggers display change
   global date, nfl_time
   if event == "up":
     if sport == "nfl":
@@ -191,30 +191,34 @@ def change_day(event):
     else:
       date = date - datetime.timedelta(days=1)
   source_trigger.set()
+  source_ready.wait()
+  display_trigger.set()
 
-def change_speed(event):
+def change_speed(event):                                                  # Change dwell_time to shorten or lenghten the amount of time the scoreboard sits on a game
   global dwell_time
   if event == "ffwd":
     dwell_time -= 1
   if event == "rew":
     dwell_time += 1
 
-def shutdown():
+def shutdown():                                                           # Power button shuts the pi down completely
   subprocess.call("shutdown", "-h", "now")
 
-def change_sport(event):
+def change_sport(event):                                                  # Sport buttons switch sports, date and triggers source refresh and display change
   global sport, date
   if event == "1":
     sport = "nhl"
-  if event == "2":
+  elif event == "2":
     sport = "nba"
-  date = date.today()
-  source_trigger.set()
-  if event == "3":
+  elif event == "3":
     sport = "nfl"
     nfl_time = set_nfl_current()
+  date = date.today()
+  source_trigger.set()
+  source_ready.wait()
+  display_trigger.set()
 
-def test_display():
+def test_display():                                                       # Simple terminal output for debugging
   global scoredata, currentgame
   from time import sleep
   source_ready.wait()
@@ -230,7 +234,7 @@ def test_display():
       currentgame = 0
     sleep(5)
 
-def source_daemon():
+def source_daemon():                                                      # A looping function that updates scores at refresh_rate interval unless source_trigger is set
   print "source_daemon is running"
   while True:
     while not source_trigger.is_set():
@@ -240,7 +244,7 @@ def source_daemon():
       source_trigger.wait(refresh_rate)
     source_trigger.clear()
 
-def main():
+def main():                                                               # The main function that gets everything running
   global nfl_time, nfl_weeks
   nfl_weeks = build_nfl_times()
   nfl_time = set_nfl_current()
