@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Scoreboard Web Remote</title>
+  <script>
+  function sendCommand(cmd)
+  {
+  var xmlhttp = new XMLHttpRequest();
+  xmlhttp.open("POST", "command.php", false);
+  xmlhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+  xmlhttp.send("command="+cmd);
+  }
+  </script>
+</head>
+<body>
+<button type="button" onclick=sendCommand("nhl")>NHL</button>
+<button type="button" onclick=sendCommand("nba")>NBA</button>
+<button type="button" onclick=sendCommand("nfl")>NFL</button>
+<button type="button" onclick=sendCommand("volup")>Volume +</button>
+<button type="button" onclick=sendCommand("voldawn")>Volume -</button>
+<button type="button" onclick=sendCommand("volmute")>Volume Mute</button>
+<button type="button" onclick=sendCommand("nextgame")>Next Game</button>
+<button type="button" onclick=sendCommand("prevgame")>Prev Game</button>
+<button type="button" onclick=sendCommand("nextday")>Next Day</button>
+<button type="button" onclick=sendCommand("prevday")>Prev Day</button>
+<button type="button" onclick=sendCommand("dwelldown")>Dwell Less</button>
+<button type="button" onclick=sendCommand("dwellup")>Dwell More</button>
+<button type="button" onclick=sendCommand("mode")>Change Mode</button>
+<button type="button" onclick=sendCommand("shutdown")>Shutdown</button>
+</body>
+</html>

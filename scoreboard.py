@@ -2,6 +2,7 @@ import re, threading, subprocess, json, nflgame
 from urllib2 import urlopen
 from datetime import date, timedelta
 from operator import itemgetter
+from bottle import request, route, static_file, run
 
 date = date.today()
 dwell_time = 5
@@ -154,6 +155,7 @@ def ir_monitor():                                                         # IR d
   listener.register('stop', toggle_display)  
   listener.register('1', change_sport)
   listener.register('2', change_sport)
+  listener.register('2', change_sport)
   listener.activate()
 
 def change_vol(event):                                                    # Changes volume up, down, or toggles mute... obviously
@@ -218,6 +220,38 @@ def change_sport(event):                                                  # Spor
   source_ready.wait()
   display_trigger.set()
 
+@route('/controller.htm')
+def control():
+  return static_file('controller.htm', root='www')
+
+@route('/command.php', method='POST')
+def webcommand():
+  dothis = request.forms.get('command')
+  if dothis == "nhl" or dothis == "nba" or dothis == "nfl":
+    change_sport(dothis)
+  elif dothis == "volup":
+    change_vol("vol+")
+  elif dothis == "voldown":
+    change_vol("vol-")
+  elif dothis == "volmute":
+    change_vol("mute")
+  elif dothis == "nextgame":
+    change_game("right")
+  elif dothis == "prevgame":
+    change_game("left")
+  elif dothis == "nextday":
+    change_day("up")
+  elif dothis == "prevday":
+    change_day("down")
+  elif dothis == "dwelldown":
+    change_speed("ffwd")
+  elif dothis == "dwellup":
+    change_speed("rew")
+  elif dothis == "mode":
+    pass
+  elif dothis == "shutdown":
+    shutdown()
+
 def test_display():                                                       # Simple terminal output for debugging
   global scoredata, currentgame
   from time import sleep
@@ -244,6 +278,10 @@ def source_daemon():                                                      # A lo
       source_trigger.wait(refresh_rate)
     source_trigger.clear()
 
+def remote_daemon():
+  print "remote_daemon is running"
+  run(host='localhost', port=8080)
+
 def main():                                                               # The main function that gets everything running
   global nfl_time, nfl_weeks
   nfl_weeks = build_nfl_times()
@@ -251,6 +289,9 @@ def main():                                                               # The 
   source = threading.Thread(target=source_daemon)
   source.daemon = True
   source.start()
+  remote = threading.Thread(target=remote_daemon)
+  remote.daemon = True
+  remote.start()
   test_display()
 
 main()
