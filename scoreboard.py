@@ -7,7 +7,7 @@ from bottle import request, route, static_file, run
 date = date.today()
 dwell_time = 5
 refresh_rate = 60
-sport = "nfl"
+sport = "nhl"
 currentgame = 0
 scoredata = []
 nfl_season = ""
@@ -51,8 +51,12 @@ def get_nhl_scores(date):                                                 # Pull
       time = re.search(r'(\d*:\d\d)', game['bs']).group(1)
       period = ""
     elif game['gs'] == 3:
-      time = re.search(r'(\d*:\d\d)', game['bs']).group(1)
-      period = period = re.search(r'\s(\d)', game['bs']).group(1)
+      print game['bs']
+      try:
+        time = re.search(r'(\d*:\d\d)', game['bs']).group(1)
+      except:
+        time = "00:00"
+      period = re.search(r'\s(\d)', game['bs']).group(1)
     elif game['gs'] == 5:
       time = ""
       period = "F"
@@ -208,11 +212,11 @@ def shutdown():                                                           # Powe
 
 def change_sport(event):                                                  # Sport buttons switch sports, date and triggers source refresh and display change
   global sport, date
-  if event == "1":
+  if event == "1" or event == "nhl":
     sport = "nhl"
-  elif event == "2":
+  elif event == "2" or event == "nba":
     sport = "nba"
-  elif event == "3":
+  elif event == "3" or event == "nfl":
     sport = "nfl"
     nfl_time = set_nfl_current()
   date = date.today()
