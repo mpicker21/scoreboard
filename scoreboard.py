@@ -183,19 +183,20 @@ def change_game(event):                                                   # Upda
   display_trigger.set()
 
 def change_day(event):                                                    # Updates date to next or previous day, triggers source refresh, and triggers display change
-  global date, nfl_time
+  global date, nfl_time, currentgame
   if event == "up":
     if sport == "nfl":
       if nfl_time < 25:
         nfl_time += 1
     else:
-      date = date + datetime.timedelta(days=1)
+      date = date + timedelta(days=1)
   elif event == "down":
     if sport == "nfl":
       if nfl_time > 0:
         nfl_time -= 1
     else:
-      date = date - datetime.timedelta(days=1)
+      date = date - timedelta(days=1)
+  currentgame = 0
   source_trigger.set()
   source_ready.wait()
   display_trigger.set()
@@ -270,7 +271,7 @@ def test_display():                                                       # Simp
     currentgame += 1
     if currentgame > (len(scoredata) - 1):
       currentgame = 0
-    sleep(5)
+    sleep(dwell_time)
 
 def source_daemon():                                                      # A looping function that updates scores at refresh_rate interval unless source_trigger is set
   print "source_daemon is running"
@@ -284,7 +285,7 @@ def source_daemon():                                                      # A lo
 
 def remote_daemon():
   print "remote_daemon is running"
-  run(host='localhost', port=8080)
+  run(host='192.168.1.117', port=8080)
 
 def main():                                                               # The main function that gets everything running
   global nfl_time, nfl_weeks
