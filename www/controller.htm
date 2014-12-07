@@ -11,21 +11,76 @@
   xmlhttp.send("command="+cmd);
   }
   </script>
+<style>
+.myButton {
+  background: #3498db;
+  background-image: -webkit-linear-gradient(top, #3498db, #2980b9);
+  background-image: -moz-linear-gradient(top, #3498db, #2980b9);
+  background-image: -ms-linear-gradient(top, #3498db, #2980b9);
+  background-image: -o-linear-gradient(top, #3498db, #2980b9);
+  background-image: linear-gradient(to bottom, #3498db, #2980b9);
+  -webkit-border-radius: 10;
+  -moz-border-radius: 10;
+  border-radius: 10px;
+  font-family: Courier New;
+  color: #ffffff;
+  font-size: 20px;
+  padding: 10px;
+  text-decoration: none;
+}
+
+.myButton:hover {
+  background: #3cb0fd;
+  background-image: -webkit-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -moz-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -ms-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: -o-linear-gradient(top, #3cb0fd, #3498db);
+  background-image: linear-gradient(to bottom, #3cb0fd, #3498db);
+  text-decoration: none;
+}
+
+.myButton:focus {
+  outline:0;
+}
+</style>
 </head>
 <body>
-<button type="button" onclick=sendCommand("nhl")>NHL</button>
-<button type="button" onclick=sendCommand("nba")>NBA</button>
-<button type="button" onclick=sendCommand("nfl")>NFL</button>
-<button type="button" onclick=sendCommand("volup")>Volume +</button>
-<button type="button" onclick=sendCommand("voldawn")>Volume -</button>
-<button type="button" onclick=sendCommand("volmute")>Volume Mute</button>
-<button type="button" onclick=sendCommand("nextgame")>Next Game</button>
-<button type="button" onclick=sendCommand("prevgame")>Prev Game</button>
-<button type="button" onclick=sendCommand("nextday")>Next Day</button>
-<button type="button" onclick=sendCommand("prevday")>Prev Day</button>
-<button type="button" onclick=sendCommand("dwelldown")>Dwell Less</button>
-<button type="button" onclick=sendCommand("dwellup")>Dwell More</button>
-<button type="button" onclick=sendCommand("mode")>Change Mode</button>
-<button type="button" onclick=sendCommand("shutdown")>Shutdown</button>
+<center>
+<fieldset>
+  <legend>Sport</legend>
+<button type="button" class="myButton" onclick=sendCommand("nhl")>NHL</button>
+<button type="button" class="myButton" onclick=sendCommand("nba")>NBA</button>
+<button type="button" class="myButton" onclick=sendCommand("nfl")>NFL</button>
+</fieldset>
+<fieldset>
+  <legend>Volume</legend>
+<button type="button" class="myButton" onclick=sendCommand("volup")>+</button>
+<button type="button" class="myButton" onclick=sendCommand("voldawn")>-</button>
+<button type="button" class="myButton" onclick=sendCommand("volmute")>Mute</button>
+</fieldset>
+<fieldset>
+  <legend>Day/Game</legend>
+<p>Day:</p>
+<p>
+<button type="button" class="myButton" onclick=sendCommand("nextday")>Next</button>
+<button type="button" class="myButton" onclick=sendCommand("prevday")>Prev</button>
+</p>
+<p>Game:</p>
+<p>
+<button type="button" class="myButton" onclick=sendCommand("nextgame")>Next</button>
+<button type="button" class="myButton" onclick=sendCommand("prevgame")>Prev</button>
+</p>
+</fieldset>
+<fieldset>
+  <legend>Settings</legend>
+<p>Dwell:</p>
+<p>
+<button type="button" class="myButton" onclick=sendCommand("dwellup")>+</button>
+<button type="button" class="myButton" onclick=sendCommand("dwelldown")>-</button>
+</p>
+<button type="button" class="myButton" onclick=sendCommand("mode")>Mode</button>
+<button type="button" class="myButton" onclick=sendCommand("shutdown")>Shutdown</button>
+</fieldset>
+</center>
 </body>
 </html>
