@@ -8,8 +8,10 @@ date = date.today()
 dwell_time = 5
 refresh_rate = 60
 sport = "nhl"
+dedicated_mode = False
 currentgame = 0
 scoredata = []
+last_score = ""
 nfl_season = ""
 nfl_time = ""
 nfl_weeks = ""
@@ -50,8 +52,10 @@ def get_nhl_scores(date):                                                 # Pull
     if game['gs'] == 1:
       time = re.search(r'(\d*:\d\d)', game['bs']).group(1)
       period = ""
+    elif game['gs'] == 2:
+      time = ""
+      period = "P"
     elif game['gs'] == 3:
-      print game['bs']
       try:
         time = re.search(r'(\d*:\d\d)', game['bs']).group(1)
       except:
@@ -164,11 +168,11 @@ def ir_monitor():                                                         # IR d
 
 def change_vol(event):                                                    # Changes volume up, down, or toggles mute... obviously
   if event == "vol+":
-    subprocess.call("amixer", "set", "PCM", "200+")
+    subprocess.call(["amixer", "set", "PCM", "200+"])
   if event == "vol-":
-    subprocess.call("amixer", "set", "PCM", "200-")
+    subprocess.call(["amixer", "set", "PCM", "200-"])
   if event == "mute":
-    subprocess.call("amixer", "set", "PCM", "toggle")
+    subprocess.call(["amixer", "set", "PCM", "toggle"])
 
 def change_game(event):                                                   # Updates currentgame to the next or previous game and then triggers the display to change
   global currentgame, scoredata
@@ -176,10 +180,10 @@ def change_game(event):                                                   # Upda
     currentgame += 1
     if currentgame > (len(scoredata) - 1):
       currentgame = 0
-  elif currentgame == "left":
+  if event == "left":
     currentgame -= 1
     if currentgame < 0:
-      currentgame = (len(scoredata) -1)
+      currentgame = (len(scoredata) - 1)
   display_trigger.set()
 
 def change_day(event):                                                    # Updates date to next or previous day, triggers source refresh, and triggers display change
@@ -208,11 +212,20 @@ def change_speed(event):                                                  # Chan
   if event == "rew":
     dwell_time += 1
 
+def change_mode():
+  global dedicated_mode, last_score
+  dedicated_mode = not dedicated_mode
+  if dedicated_mode:
+    last_score = scoredata[currentgame]
+    source_trigger.set()
+    source_ready.wait()
+  display_trigger.set()
+
 def shutdown():                                                           # Power button shuts the pi down completely
   subprocess.call("shutdown", "-h", "now")
 
 def change_sport(event):                                                  # Sport buttons switch sports, date and triggers source refresh and display change
-  global sport, date
+  global sport, date, currentgame
   if event == "1" or event == "nhl":
     sport = "nhl"
   elif event == "2" or event == "nba":
@@ -220,6 +233,7 @@ def change_sport(event):                                                  # Spor
   elif event == "3" or event == "nfl":
     sport = "nfl"
     nfl_time = set_nfl_current()
+  currentgame = 0
   date = date.today()
   source_trigger.set()
   source_ready.wait()
@@ -253,25 +267,54 @@ def webcommand():
   elif dothis == "dwellup":
     change_speed("rew")
   elif dothis == "mode":
-    pass
+    change_mode()
   elif dothis == "shutdown":
     shutdown()
 
+def dedicated_compare(last):
+  with scoreslock:
+    if last['gameid'] != scoredata[currentgame]['gameid']:
+      pass
+    if last == scoredata[currentgame]:
+      pass
+    elif last['homescore'] != scoredata[currentgame]['homescore']:
+      print "Home team scored!"
+    elif last['awayscore'] != scoredata[currentgame]['awayscore']:
+      print "Away team scored!"
+    elif last['period'] == "":
+      pass
+    elif last['time'] != scoredata[currentgame]['time']:
+      if scoredata[currentgame]['time'] == "00:00" or "":
+        print "End of period!"
+      elif last['period'] != scoredata[currentgame]['period']:
+        if last['time'] != "00:00" or "":
+          print "End of period!"
+      else:
+        pass
+
 def test_display():                                                       # Simple terminal output for debugging
-  global scoredata, currentgame
+  global scoredata, currentgame, last_score
   from time import sleep
   source_ready.wait()
   while True:
-    with scoreslock:
-      print "Game: %s" % (scoredata[currentgame]['gameid'])
-      print "Time: %s  Period: %s" % (scoredata[currentgame]['time'], scoredata[currentgame]['period'])
-      print "Away: %s    %s" % (scoredata[currentgame]['awayteam'], scoredata[currentgame]['awayscore'])
-      print "Home: %s    %s" % (scoredata[currentgame]['hometeam'], scoredata[currentgame]['homescore'])
-      print ""
-    currentgame += 1
-    if currentgame > (len(scoredata) - 1):
-      currentgame = 0
-    sleep(dwell_time)
+    while not display_trigger.is_set():
+      if not dedicated_mode:
+        currentgame += 1
+        if currentgame > (len(scoredata) - 1):
+          currentgame = 0
+      with scoreslock:
+        print "Game: %s" % (scoredata[currentgame]['gameid'])
+        print "Time: %s  Period: %s" % (scoredata[currentgame]['time'], scoredata[currentgame]['period'])
+        print "Away: %s    %s" % (scoredata[currentgame]['awayteam'], scoredata[currentgame]['awayscore'])
+        print "Home: %s    %s" % (scoredata[currentgame]['hometeam'], scoredata[currentgame]['homescore'])
+        print ""
+      if dedicated_mode:
+        dedicated_compare(last_score)
+        last_score = scoredata[currentgame]
+        display_trigger.wait(10)
+      else:
+        display_trigger.wait(dwell_time)
+    display_trigger.clear()
 
 def source_daemon():                                                      # A looping function that updates scores at refresh_rate interval unless source_trigger is set
   print "source_daemon is running"
@@ -280,12 +323,15 @@ def source_daemon():                                                      # A lo
       print "updating scores"
       update_scores()
       source_ready.set()
-      source_trigger.wait(refresh_rate)
+      if dedicated_mode:
+        source_trigger.wait(10)
+      else:
+        source_trigger.wait(refresh_rate)
     source_trigger.clear()
 
 def remote_daemon():
   print "remote_daemon is running"
-  run(host='192.168.1.117', port=8080)
+  run(host='0.0.0.0', port=8080)
 
 def main():                                                               # The main function that gets everything running
   global nfl_time, nfl_weeks
