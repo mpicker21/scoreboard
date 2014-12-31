@@ -1,9 +1,14 @@
-import re, threading, subprocess, json, nflgame
+import re, threading, subprocess, json, nflgame, smbus
 from urllib2 import urlopen
 from datetime import date, timedelta
 from operator import itemgetter
 from bottle import request, route, static_file, run
 
+# This section declares strings, locks, etc.
+i2c = smbus.SMBus(1)
+disp_home = 0x52
+disp_away = 0x50
+disp_teambrt = 0x33
 date = date.today()
 dwell_time = 5
 refresh_rate = 60
@@ -19,7 +24,36 @@ scoreslock = threading.Lock()
 source_trigger = threading.Event()
 display_trigger = threading.Event()
 source_ready = threading.Event()
+disp_ready = threading.Event()
 
+# This section defines functions
+#   Hardware functions
+def init_board():
+  try:
+    for x in [disp_home, disp_away]:
+      i2c.write_byte_data(x, 0x04, 0x05                                   # Turns MAX6953 on and sets fast blink
+      i2c.write_i2c_block_data(x, 0x01, [disp_teambrt, disp_teambrt])     # Sets brightness for the team name
+      i2c.write_byte_data(x, 0x03, 0x01)                                  # Sets SCANLIMIT to 4
+  except:
+    init_board()
+    return
+  disp_ready.set()
+  return
+
+def set_team(hoa, name):
+  namechars = []
+  for ch in enumerate(name):
+    namechars.append(ord(ch))
+  try:
+    i2c.write_i2c_block_data(hoa, 0x20, [0x20, 0x20, 0x20])
+    i2c.write_itc_block_data(hoa, 0x20, namechars)
+  except:
+    init_board()
+    set_team(hoa, name)
+    return
+  return
+
+#   Source functions
 def build_nfl_times():                                                    # Build table of PRE/REG/POST and weeks in each to make it easier to reference with nfl_time
   a = []
   for x in range(0, 4 + 1):
@@ -147,6 +181,7 @@ def update_scores():                                                      # Runs
   elif sport == "nfl":
     get_nfl_scores(nfl_time)
 
+#   Controller functions
 def ir_monitor():                                                         # IR daemon, sets up listener for buttons and ties them to commands
   listener = pifacecad.IREventListener(prog="scoreboard")
   listener.register('vol+', change_vol)
@@ -271,6 +306,7 @@ def webcommand():
   elif dothis == "shutdown":
     shutdown()
 
+#   Other functions
 def dedicated_compare(last):
   with scoreslock:
     if last['gameid'] != scoredata[currentgame]['gameid']:
@@ -303,6 +339,8 @@ def test_display():                                                       # Simp
         if currentgame > (len(scoredata) - 1):
           currentgame = 0
       with scoreslock:
+        set_team(disp_home, scoredata[currentgame]['hometeam']
+        set_team(disp_away, scoredata[currentgame]['awayteam']
         print "Game: %s" % (scoredata[currentgame]['gameid'])
         print "Time: %s  Period: %s" % (scoredata[currentgame]['time'], scoredata[currentgame]['period'])
         print "Away: %s    %s" % (scoredata[currentgame]['awayteam'], scoredata[currentgame]['awayscore'])
@@ -316,6 +354,7 @@ def test_display():                                                       # Simp
         display_trigger.wait(dwell_time)
     display_trigger.clear()
 
+#   Daemon functions
 def source_daemon():                                                      # A looping function that updates scores at refresh_rate interval unless source_trigger is set
   print "source_daemon is running"
   while True:
