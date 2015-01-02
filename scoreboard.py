@@ -8,7 +8,7 @@ from bottle import request, route, static_file, run
 i2c = smbus.SMBus(1)
 disp_home = 0x52
 disp_away = 0x50
-disp_teambrt = 0x33
+disp_teambrt = 0x22
 date = date.today()
 dwell_time = 5
 refresh_rate = 60
@@ -31,26 +31,29 @@ disp_ready = threading.Event()
 def init_board():
   try:
     for x in [disp_home, disp_away]:
-      i2c.write_byte_data(x, 0x04, 0x05                                   # Turns MAX6953 on and sets fast blink
+      i2c.write_byte_data(x, 0x04, 0x05)                                  # Turns MAX6953 on and sets fast blink
       i2c.write_i2c_block_data(x, 0x01, [disp_teambrt, disp_teambrt])     # Sets brightness for the team name
       i2c.write_byte_data(x, 0x03, 0x01)                                  # Sets SCANLIMIT to 4
   except:
     init_board()
     return
   disp_ready.set()
+  print "Board Initialized"
   return
 
 def set_team(hoa, name):
   namechars = []
-  for ch in enumerate(name):
+  for ch in name:
+    print ch
+    print ord(ch)
     namechars.append(ord(ch))
-  try:
-    i2c.write_i2c_block_data(hoa, 0x20, [0x20, 0x20, 0x20])
-    i2c.write_itc_block_data(hoa, 0x20, namechars)
-  except:
-    init_board()
-    set_team(hoa, name)
-    return
+  #try:
+  i2c.write_i2c_block_data(hoa, 0x20, [0x20, 0x20, 0x20])
+  i2c.write_i2c_block_data(hoa, 0x20, namechars)
+  #except:
+    #init_board()
+    #set_team(hoa, name)
+  #  return
   return
 
 #   Source functions
@@ -332,6 +335,7 @@ def test_display():                                                       # Simp
   global scoredata, currentgame, last_score
   from time import sleep
   source_ready.wait()
+  init_board()
   while True:
     while not display_trigger.is_set():
       if not dedicated_mode:
@@ -339,8 +343,8 @@ def test_display():                                                       # Simp
         if currentgame > (len(scoredata) - 1):
           currentgame = 0
       with scoreslock:
-        set_team(disp_home, scoredata[currentgame]['hometeam']
-        set_team(disp_away, scoredata[currentgame]['awayteam']
+        set_team(disp_home, scoredata[currentgame]['hometeam'])
+        set_team(disp_away, scoredata[currentgame]['awayteam'])
         print "Game: %s" % (scoredata[currentgame]['gameid'])
         print "Time: %s  Period: %s" % (scoredata[currentgame]['time'], scoredata[currentgame]['period'])
         print "Away: %s    %s" % (scoredata[currentgame]['awayteam'], scoredata[currentgame]['awayscore'])
