@@ -1,4 +1,5 @@
 import re, threading, subprocess, json, nflgame, smbus
+import wiringpi2 as wiringpi
 from urllib2 import urlopen
 from datetime import date, timedelta
 from operator import itemgetter
@@ -9,6 +10,7 @@ i2c = smbus.SMBus(1)
 disp_home = 0x52
 disp_away = 0x50
 disp_teambrt = 0x22
+disp_numbrt = 800
 date = date.today()
 dwell_time = 5
 refresh_rate = 60
@@ -20,6 +22,7 @@ last_score = ""
 nfl_season = ""
 nfl_time = ""
 nfl_weeks = ""
+digits = ['11111100', '01100000', '11011010', '11110010', '01100110', '10110110', '10111110', '11100100', '11111110', '11110110', '10001110', '00000000', '11001110']
 scoreslock = threading.Lock()
 source_trigger = threading.Event()
 display_trigger = threading.Event()
@@ -29,6 +32,13 @@ disp_ready = threading.Event()
 # This section defines functions
 #   Hardware functions
 def init_board():
+  wiringpi.wiringPiSetupPhys()
+  wiringpi.pinMode(7, 1)
+  wiringpi.pinMode(11, 1)
+  wiringpi.pinMode(13, 1)
+### need to insert code to blank display so that the next line doesn't flash all segments until data is displayed
+  wiringpi.pinMode(12, 2)
+  wiringpi.pwmWrite(12, disp_numbrt)
   try:
     for x in [disp_home, disp_away]:
       i2c.write_byte_data(x, 0x04, 0x05)                                  # Turns MAX6953 on and sets fast blink
@@ -47,14 +57,59 @@ def set_team(hoa, name):
     print ch
     print ord(ch)
     namechars.append(ord(ch))
-  #try:
   i2c.write_i2c_block_data(hoa, 0x20, [0x20, 0x20, 0x20])
   i2c.write_i2c_block_data(hoa, 0x20, namechars)
-  #except:
-    #init_board()
-    #set_team(hoa, name)
-  #  return
   return
+
+def build_num_str(homescore, awayscore, time, period):
+  num_str = []
+  if len(homescore) == 0:
+    num_str.append(digits[11])
+    num_str.append(digits[11])
+  elif len(homescore) == 1:
+    num_str.append(digits[11])
+    num_str.append(digits[int(homescore[0])])
+  else:
+    num_str.append(digits[int(homescore[0])])
+    num_str.append(digits[int(homescore[1])])
+  if len(time) == 0:
+    for x in range(0, 4):
+      num_str.append(digits[11])
+  elif len(time) == 4:
+    num_str.append(digits[11])
+    for x in range(0, 4):
+      if time[x] != ':':
+        num_str.append(digits[int(time[x])])
+  else:
+    for x in range(0, 5):
+      if time[x] != ':':
+        num_str.append(digits[int(time[x])])
+  if len(awayscore) == 0:
+    num_str.append(digits[11])
+    num_str.append(digits[11])
+  elif len(awayscore) == 1:
+    num_str.append(digits[11])
+    num_str.append(digits[int(awayscore[0])])
+  else:
+    num_str.append(digits[int(awayscore[0])])
+    num_str.append(digits[int(awayscore[1])])
+  if len(period) == 0:
+    num_str.append(digits[11])
+  elif period == "P":
+    num_str.append(digits[12])
+  elif period == "F":
+    num_str.append(digits[10])
+  else: 
+    num_str.append(digits[period])
+  return ''.join(num_str)
+
+def set_numbers(num_str):
+  wiringpi.digitalWrite(7, 0)
+  for x in range(71, -1, -1):
+    wiringpi.digitalWrite(13, 0)
+    wiringpi.digitalWrite(11, int(num_str[x]))
+    wiringpi.digitalWrite(13, 1)
+  wiringpi.digitalWrite(7, 1)
 
 #   Source functions
 def build_nfl_times():                                                    # Build table of PRE/REG/POST and weeks in each to make it easier to reference with nfl_time
@@ -84,8 +139,8 @@ def get_nhl_scores(date):                                                 # Pull
   for game in games:
     awayteam = game['ata']
     hometeam = game['hta']
-    awayscore = game['ats']
-    homescore = game['hts']
+    awayscore = str(game['ats'])
+    homescore = str(game['hts'])
     if game['gs'] == 1:
       time = re.search(r'(\d*:\d\d)', game['bs']).group(1)
       period = ""
@@ -343,13 +398,14 @@ def test_display():                                                       # Simp
         if currentgame > (len(scoredata) - 1):
           currentgame = 0
       with scoreslock:
-        set_team(disp_home, scoredata[currentgame]['hometeam'])
-        set_team(disp_away, scoredata[currentgame]['awayteam'])
+#        set_team(disp_home, scoredata[currentgame]['hometeam'])
+#        set_team(disp_away, scoredata[currentgame]['awayteam'])
         print "Game: %s" % (scoredata[currentgame]['gameid'])
         print "Time: %s  Period: %s" % (scoredata[currentgame]['time'], scoredata[currentgame]['period'])
         print "Away: %s    %s" % (scoredata[currentgame]['awayteam'], scoredata[currentgame]['awayscore'])
         print "Home: %s    %s" % (scoredata[currentgame]['hometeam'], scoredata[currentgame]['homescore'])
         print ""
+        set_numbers(build_num_str(scoredata[currentgame]['homescore'], scoredata[currentgame]['awayscore'], scoredata[currentgame]['time'], scoredata[currentgame]['period']))
       if dedicated_mode:
         dedicated_compare(last_score)
         last_score = scoredata[currentgame]
