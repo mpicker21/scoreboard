@@ -80,10 +80,14 @@ def build_num_str(homescore, awayscore, time, period):
     for x in range(0, 4):
       if time[x] != ':':
         num_str.append(digits[int(time[x])])
+    num_str[3] = str(int(num_str[3]) + 1)
+    num_str[4] = str(int(num_str[4]) + 1)
   else:
     for x in range(0, 5):
       if time[x] != ':':
         num_str.append(digits[int(time[x])])
+    num_str[3] = str(int(num_str[3]) + 1)
+    num_str[4] = str(int(num_str[4]) + 1)
   if len(awayscore) == 0:
     num_str.append(digits[11])
     num_str.append(digits[11])
